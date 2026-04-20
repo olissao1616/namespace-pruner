@@ -145,6 +145,8 @@ func (s *suite) createNamespace(t *testing.T, name string) {
 }
 
 // createImageStream creates an ImageStream with tags via dynamic client.
+// Because the CRD declares subresources.status, the status field is ignored
+// on Create and must be written via a separate UpdateStatus call.
 func (s *suite) createImageStream(t *testing.T, ns, name string, tags []imagev1.NamedTagEventList) {
 	t.Helper()
 
@@ -154,26 +156,39 @@ func (s *suite) createImageStream(t *testing.T, ns, name string, tags []imagev1.
 		Resource: "imagestreams",
 	}
 
-	obj := map[string]any{
-		"apiVersion": "image.openshift.io/v1",
-		"kind":       "ImageStream",
-		"metadata":   map[string]any{"name": name, "namespace": ns},
-		"status":     map[string]any{"tags": marshalTags(tags)},
-	}
-
-	raw, _ := json.Marshal(obj)
-	unstructured := &unstructuredObj{}
-	json.Unmarshal(raw, unstructured)
-
-	_, err := s.dynamic.Resource(gvr).Namespace(ns).Create(
+	// Create the resource without status (status is stripped anyway).
+	created, err := s.dynamic.Resource(gvr).Namespace(ns).Create(
 		s.ctx,
-		toUnstructured(obj),
+		toUnstructured(map[string]any{
+			"apiVersion": "image.openshift.io/v1",
+			"kind":       "ImageStream",
+			"metadata":   map[string]any{"name": name, "namespace": ns},
+		}),
 		metav1.CreateOptions{},
 	)
 	if err != nil {
 		t.Fatalf("create ImageStream %q/%q: %v", ns, name, err)
 	}
-	_ = unstructured
+
+	// Write status via the status subresource so status.tags is persisted.
+	statusObj := toUnstructured(map[string]any{
+		"apiVersion": "image.openshift.io/v1",
+		"kind":       "ImageStream",
+		"metadata": map[string]any{
+			"name":            name,
+			"namespace":       ns,
+			"resourceVersion": created.GetResourceVersion(),
+		},
+		"status": map[string]any{"tags": marshalTags(tags)},
+	})
+	_, err = s.dynamic.Resource(gvr).Namespace(ns).UpdateStatus(
+		s.ctx,
+		statusObj,
+		metav1.UpdateOptions{},
+	)
+	if err != nil {
+		t.Fatalf("update ImageStream status %q/%q: %v", ns, name, err)
+	}
 }
 
 // createPod creates a pod referencing a specific image.
