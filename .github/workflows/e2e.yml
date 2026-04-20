@@ -1,0 +1,140 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * *"   # nightly at 6am UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  checks: write        # required for test reporter to post check annotations
+  pull-requests: write # required to post test summary comment on PRs
+
+jobs:
+  e2e:
+    name: E2E — Kind + OpenShift CRDs
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install go-junit-report
+        run: go install github.com/jstemmer/go-junit-report/v2@latest
+
+      - name: Install Kind
+        uses: helm/kind-action@v1
+        with:
+          version: v0.23.0
+          cluster_name: pruner-e2e
+          wait: 60s
+
+      - name: Verify cluster is up
+        run: kubectl cluster-info && kubectl get nodes
+
+      - name: Install OpenShift ImageStream CRDs
+        run: |
+          kubectl apply -f test/fixtures/crds/imagestreams.yaml
+          kubectl apply -f test/fixtures/crds/imagestreamtags.yaml
+          kubectl wait --for condition=established --timeout=30s \
+            crd/imagestreams.image.openshift.io \
+            crd/imagestreamtags.image.openshift.io
+
+      - name: Sync go.mod
+        run: go mod tidy
+
+      - name: Run E2E tests
+        run: |
+          export KUBECONFIG="${HOME}/.kube/config"
+          echo "Using KUBECONFIG=$KUBECONFIG"
+          go test -v -tags e2e -timeout 10m ./test/e2e/... \
+            2>&1 | tee e2e-output.txt
+        continue-on-error: true  # let report steps run even on test failure
+
+      - name: Convert to JUnit XML
+        if: always()
+        run: |
+          go-junit-report -in e2e-output.txt -set-exit-code \
+            -out e2e-results.xml 2>/dev/null || true
+
+      - name: Publish test results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: E2E Test Results
+          path: e2e-results.xml
+          reporter: java-junit
+          fail-on-error: false
+
+      - name: Write job summary
+        if: always()
+        run: |
+          echo "## E2E Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          # parse PASS/FAIL counts from go test -v output
+          PASS=$(grep -c '^--- PASS:' e2e-output.txt 2>/dev/null || echo 0)
+          FAIL=$(grep -c '^--- FAIL:' e2e-output.txt 2>/dev/null || echo 0)
+          SKIP=$(grep -c '^--- SKIP:' e2e-output.txt 2>/dev/null || echo 0)
+          if [ "$FAIL" -gt 0 ]; then
+            echo "| Result | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| ✅ Passed | $PASS |" >> $GITHUB_STEP_SUMMARY
+            echo "| ❌ Failed | $FAIL |" >> $GITHUB_STEP_SUMMARY
+            echo "| ⏭️ Skipped | $SKIP |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Failed tests" >> $GITHUB_STEP_SUMMARY
+            echo '```' >> $GITHUB_STEP_SUMMARY
+            grep -A5 '^--- FAIL:' e2e-output.txt >> $GITHUB_STEP_SUMMARY || true
+            echo '```' >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Result | Count |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| ✅ Passed | $PASS |" >> $GITHUB_STEP_SUMMARY
+            echo "| ⏭️ Skipped | $SKIP |" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "<details><summary>Full test output</summary>" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat e2e-output.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "</details>" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload E2E artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: |
+            e2e-output.txt
+            e2e-results.xml
+
+      - name: Fail if tests failed
+        if: always()
+        run: |
+          if grep -q '^FAIL' e2e-output.txt 2>/dev/null; then
+            echo "E2E tests failed" && exit 1
+          fi
+
+      - name: Dump cluster state on failure
+        if: failure()
+        run: |
+          echo "=== Nodes ==="
+          kubectl get nodes -o wide
+          echo "=== Namespaces ==="
+          kubectl get namespaces
+          echo "=== ImageStreams ==="
+          kubectl get imagestreams --all-namespaces 2>/dev/null || echo "no imagestreams"
+          echo "=== Pods ==="
+          kubectl get pods --all-namespaces
+          echo "=== Events ==="
+          kubectl get events --all-namespaces --sort-by='.lastTimestamp' | tail -30
