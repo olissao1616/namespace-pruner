@@ -1,0 +1,40 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: pruner
+  namespace: pruner-system
+spec:
+  schedule: "0 2 * * *"        # daily at 2am
+  concurrencyPolicy: Forbid     # prevent overlapping runs
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          serviceAccountName: pipeline
+          restartPolicy: OnFailure
+          containers:
+            - name: pruner
+              image: registry.example.com/ag/pruner:latest
+              imagePullPolicy: Always
+              envFrom:
+                - secretRef:
+                    name: pruner-secrets
+              env:
+                - name: POLICY_PATH
+                  value: /config/policy.yaml
+              volumeMounts:
+                - name: policy
+                  mountPath: /config
+                  readOnly: true
+              resources:
+                requests:
+                  cpu: 100m
+                  memory: 128Mi
+                limits:
+                  cpu: 500m
+                  memory: 256Mi
+          volumes:
+            - name: policy
+              configMap:
+                name: pruner-policy

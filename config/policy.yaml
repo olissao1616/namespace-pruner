@@ -1,0 +1,20 @@
+maxImageAgeDays: 60
+
+rules:
+  - type: AGE
+    threshold: 60
+  - type: UNREFERENCED
+    threshold: 30
+
+whitelist:
+  namespaces: []
+  images: []
+
+jira:
+  project: PLAT
+  issuetype: Bug
+  slaDays: 14
+
+cleanup:
+  dryRun: true
+  maxDeletionsPerRun: 50

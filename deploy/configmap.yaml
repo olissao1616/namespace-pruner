@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pruner-policy
+  namespace: pruner-system
+data:
+  policy.yaml: |
+    maxImageAgeDays: 60
+    rules:
+      - type: AGE
+        threshold: 60
+      - type: UNREFERENCED
+        threshold: 30
+    whitelist:
+      namespaces: []
+      images: []
+    jira:
+      project: PLAT
+      issuetype: Bug
+      slaDays: 14
+    cleanup:
+      dryRun: true
+      maxDeletionsPerRun: 50

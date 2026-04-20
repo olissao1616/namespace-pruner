@@ -1,0 +1,22 @@
+# Binaries
+pruner
+*.exe
+
+# Go
+vendor/
+*.test
+*.out
+coverage.txt
+
+# Secrets — never commit
+.env
+*.env
+secrets.sh
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
