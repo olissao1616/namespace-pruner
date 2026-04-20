@@ -6,6 +6,9 @@ import (
 	"testing"
 	"time"
 
+	imagev1 "github.com/openshift/api/image/v1"
+	imageclient "github.com/openshift/client-go/image/clientset/versioned"
+	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/ag/pruner/internal/cleanup"
@@ -16,8 +19,6 @@ import (
 	"github.com/ag/pruner/internal/policy"
 	"github.com/ag/pruner/internal/report"
 	"github.com/ag/pruner/internal/scanner"
-	imageclient "github.com/openshift/client-go/image/clientset/versioned"
-	"go.uber.org/zap"
 )
 
 const e2eNS = "pruner-e2e"
