@@ -49,11 +49,6 @@ jobs:
             crd/imagestreams.image.openshift.io \
             crd/imagestreamtags.image.openshift.io
 
-      - name: Create e2e namespaces
-        run: |
-          kubectl create namespace pruner-e2e       --dry-run=client -o yaml | kubectl apply -f -
-          kubectl create namespace pruner-e2e-full  --dry-run=client -o yaml | kubectl apply -f -
-
       - name: Sync go.mod
         run: go mod tidy
 
