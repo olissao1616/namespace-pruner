@@ -1,0 +1,64 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: imagestreams.image.openshift.io
+spec:
+  group: image.openshift.io
+  names:
+    kind: ImageStream
+    listKind: ImageStreamList
+    plural: imagestreams
+    singular: imagestream
+    shortNames:
+      - is
+  scope: Namespaced
+  versions:
+    - name: v1
+      served: true
+      storage: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            apiVersion:
+              type: string
+            kind:
+              type: string
+            metadata:
+              type: object
+            spec:
+              type: object
+              x-kubernetes-preserve-unknown-fields: true
+            status:
+              type: object
+              properties:
+                tags:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      tag:
+                        type: string
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            created:
+                              type: string
+                              format: date-time
+                            dockerImageReference:
+                              type: string
+                            image:
+                              type: string
+                            generation:
+                              type: integer
+                              format: int64
+                      conditions:
+                        type: array
+                        items:
+                          type: object
+                          x-kubernetes-preserve-unknown-fields: true
+              x-kubernetes-preserve-unknown-fields: true
+      subresources:
+        status: {}

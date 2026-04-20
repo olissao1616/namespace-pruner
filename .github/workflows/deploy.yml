@@ -1,143 +1,25 @@
 name: Deploy
 
+# Deployment is managed by ArgoCD.
+# This workflow is a placeholder — update it when the GitOps manifests
+# repo is ready and ArgoCD app definitions are in place.
+#
+# Planned flow:
+#   1. Release workflow builds and pushes image to GHCR (already done)
+#   2. This workflow opens a PR in the GitOps repo updating the image tag
+#   3. ArgoCD detects the change and deploys to each cluster
+#
+# TODO: implement when GitOps repo is available.
+
 on:
-  workflow_run:
-    workflows: [Release]
-    types: [completed]
-    branches: [main]
   workflow_dispatch:
-    inputs:
-      image_tag:
-        description: "Image tag to deploy (default: latest)"
-        required: false
-        default: latest
-      cluster:
-        description: "Target cluster"
-        required: true
-        type: choice
-        options:
-          - cluster-a
-          - cluster-b
-          - cluster-c
-          - all
-
-permissions:
-  contents: read
-
-env:
-  IMAGE: ghcr.io/${{ github.repository }}
 
 jobs:
-  deploy-cluster-a:
-    name: Deploy → Cluster A
+  placeholder:
     runs-on: ubuntu-latest
-    if: >
-      (github.event_name == 'workflow_dispatch' &&
-       (inputs.cluster == 'cluster-a' || inputs.cluster == 'all')) ||
-      github.event_name == 'workflow_run'
-    environment: cluster-a
-
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Install oc CLI
-        uses: redhat-actions/openshift-tools-installer@v1
-        with:
-          oc: latest
-
-      - name: Login to OpenShift Cluster A
-        uses: redhat-actions/oc-login@v1
-        with:
-          openshift_server_url: ${{ secrets.CLUSTER_A_URL }}
-          openshift_token: ${{ secrets.CLUSTER_A_SA_TOKEN }}
-          insecure_skip_tls_verify: false
-
-      - name: Apply manifests
+      - name: ArgoCD deployment not yet configured
         run: |
-          oc apply -f deploy/serviceaccount.yaml -n pruner-system
-          oc apply -f deploy/configmap.yaml      -n pruner-system
-          oc apply -f deploy/cronjob.yaml        -n pruner-system
-
-      - name: Update image tag
-        run: |
-          TAG=${{ inputs.image_tag || 'latest' }}
-          oc set image cronjob/pruner pruner=${{ env.IMAGE }}:${TAG} -n pruner-system
-
-      - name: Verify rollout
-        run: oc get cronjob pruner -n pruner-system
-
-  deploy-cluster-b:
-    name: Deploy → Cluster B
-    runs-on: ubuntu-latest
-    if: >
-      (github.event_name == 'workflow_dispatch' &&
-       (inputs.cluster == 'cluster-b' || inputs.cluster == 'all')) ||
-      github.event_name == 'workflow_run'
-    environment: cluster-b
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install oc CLI
-        uses: redhat-actions/openshift-tools-installer@v1
-        with:
-          oc: latest
-
-      - name: Login to OpenShift Cluster B
-        uses: redhat-actions/oc-login@v1
-        with:
-          openshift_server_url: ${{ secrets.CLUSTER_B_URL }}
-          openshift_token: ${{ secrets.CLUSTER_B_SA_TOKEN }}
-          insecure_skip_tls_verify: false
-
-      - name: Apply manifests
-        run: |
-          oc apply -f deploy/serviceaccount.yaml -n pruner-system
-          oc apply -f deploy/configmap.yaml      -n pruner-system
-          oc apply -f deploy/cronjob.yaml        -n pruner-system
-
-      - name: Update image tag
-        run: |
-          TAG=${{ inputs.image_tag || 'latest' }}
-          oc set image cronjob/pruner pruner=${{ env.IMAGE }}:${TAG} -n pruner-system
-
-      - name: Verify rollout
-        run: oc get cronjob pruner -n pruner-system
-
-  deploy-cluster-c:
-    name: Deploy → Cluster C
-    runs-on: ubuntu-latest
-    if: >
-      (github.event_name == 'workflow_dispatch' &&
-       (inputs.cluster == 'cluster-c' || inputs.cluster == 'all')) ||
-      github.event_name == 'workflow_run'
-    environment: cluster-c
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install oc CLI
-        uses: redhat-actions/openshift-tools-installer@v1
-        with:
-          oc: latest
-
-      - name: Login to OpenShift Cluster C
-        uses: redhat-actions/oc-login@v1
-        with:
-          openshift_server_url: ${{ secrets.CLUSTER_C_URL }}
-          openshift_token: ${{ secrets.CLUSTER_C_SA_TOKEN }}
-          insecure_skip_tls_verify: false
-
-      - name: Apply manifests
-        run: |
-          oc apply -f deploy/serviceaccount.yaml -n pruner-system
-          oc apply -f deploy/configmap.yaml      -n pruner-system
-          oc apply -f deploy/cronjob.yaml        -n pruner-system
-
-      - name: Update image tag
-        run: |
-          TAG=${{ inputs.image_tag || 'latest' }}
-          oc set image cronjob/pruner pruner=${{ env.IMAGE }}:${TAG} -n pruner-system
-
-      - name: Verify rollout
-        run: oc get cronjob pruner -n pruner-system
+          echo "Deployment is managed by ArgoCD."
+          echo "See README for deployment instructions."
+          echo "TODO: wire up GitOps repo image tag update here."

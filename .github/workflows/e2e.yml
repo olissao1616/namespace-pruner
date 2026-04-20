@@ -1,0 +1,77 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 6 * * *"   # nightly at 6am UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  e2e:
+    name: E2E — Kind + OpenShift CRDs
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Install Kind
+        uses: helm/kind-action@v1
+        with:
+          version: v0.23.0
+          cluster_name: pruner-e2e
+          wait: 60s
+
+      - name: Verify cluster is up
+        run: kubectl cluster-info && kubectl get nodes
+
+      - name: Install OpenShift ImageStream CRDs
+        run: |
+          kubectl apply -f test/fixtures/crds/imagestreams.yaml
+          kubectl apply -f test/fixtures/crds/imagestreamtags.yaml
+          kubectl wait --for condition=established --timeout=30s \
+            crd/imagestreams.image.openshift.io \
+            crd/imagestreamtags.image.openshift.io
+
+      - name: Create e2e namespaces
+        run: |
+          kubectl create namespace pruner-e2e       --dry-run=client -o yaml | kubectl apply -f -
+          kubectl create namespace pruner-e2e-full  --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Run E2E tests
+        env:
+          KUBECONFIG: ${{ env.KUBECONFIG }}
+        run: |
+          go test -v -tags e2e -timeout 10m ./test/e2e/... 2>&1 | tee e2e-output.txt
+
+      - name: Upload E2E output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-results
+          path: e2e-output.txt
+
+      - name: Dump cluster state on failure
+        if: failure()
+        run: |
+          echo "=== Nodes ==="
+          kubectl get nodes -o wide
+          echo "=== Namespaces ==="
+          kubectl get namespaces
+          echo "=== ImageStreams ==="
+          kubectl get imagestreams --all-namespaces 2>/dev/null || echo "no imagestreams"
+          echo "=== Pods ==="
+          kubectl get pods --all-namespaces
+          echo "=== Events ==="
+          kubectl get events --all-namespaces --sort-by='.lastTimestamp' | tail -30
