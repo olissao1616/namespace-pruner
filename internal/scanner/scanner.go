@@ -38,6 +38,11 @@ func New(cfg *rest.Config) (*Scanner, error) {
 	return &Scanner{kube: kube, image: image}, nil
 }
 
+// NewWithClients constructs a Scanner from pre-built clients (used in tests).
+func NewWithClients(kube kubernetes.Interface, image imagev1client.Interface) *Scanner {
+	return &Scanner{kube: kube, image: image}
+}
+
 func (s *Scanner) ScanNamespace(ctx context.Context, namespace string) ([]ImageResult, error) {
 	streams, err := s.image.ImageV1().ImageStreams(namespace).List(ctx, metav1.ListOptions{})
 	if err != nil {

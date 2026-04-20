@@ -8,6 +8,10 @@ vendor/
 *.out
 coverage.txt
 
+# Docs
+*.doc
+*.docx
+
 # Secrets — never commit
 .env
 *.env
@@ -16,6 +20,7 @@ secrets.sh
 # IDE
 .vscode/
 .idea/
+.claude/
 
 # OS
 .DS_Store
