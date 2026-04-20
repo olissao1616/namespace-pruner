@@ -83,7 +83,7 @@ func main() {
 		// Raise JIRA tickets and collect keys for the report
 		var jiraKeys []string
 		for _, v := range violations {
-			key, err := jiraClient.CreateTicket(v.Namespace, v.ImageRef, v.RuleType, v.Severity, v.AgeDays)
+			key, err := jiraClient.CreateTicket(v.Namespace, v.ImageRef, v.RuleType, v.Severity, ns.OwnerEmail, v.AgeDays)
 			if err != nil {
 				nsLog.Error("jira ticket failed", zap.String("image", v.ImageRef), zap.Error(err))
 				continue
