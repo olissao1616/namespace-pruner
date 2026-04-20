@@ -12,6 +12,10 @@ Pruner is an ISB-owned automated service that enforces container image hygiene a
 - [Components](#components)
 - [Policy Configuration](#policy-configuration)
 - [Environment Variables](#environment-variables)
+- [Pre-Deployment Setup](#pre-deployment-setup)
+  - [JIRA Setup](#jira-setup)
+  - [ServiceNow CMDB Setup](#servicenow-cmdb-setup)
+  - [CHES Setup](#ches-setup)
 - [Deployment](#deployment)
 - [Local Development](#local-development)
 
@@ -271,6 +275,129 @@ cleanup:
 | `CHES_FROM` | Yes | Sender email address (authorised in CHES) |
 
 All secrets are stored in an OpenShift Secret (`pruner-secrets`) — never committed to Git.
+
+---
+
+## Pre-Deployment Setup
+
+Before deploying Pruner, the following accounts and tokens must be created. Each section lists exactly what to ask and who to ask.
+
+---
+
+### JIRA Setup
+
+**Who to contact:** IT / JIRA Administrator
+
+#### Step 1 — Create a bot account
+
+Ask IT to create a dedicated service account in Atlassian:
+
+> "Please create a JIRA user account for `pruner-bot@yourdomain.com` to be used by an automation service."
+
+- Use a shared mailbox or distribution list, not a personal email
+- The account must be licensed in your Atlassian org
+
+#### Step 2 — Grant project access
+
+Ask IT to add the bot account to your JIRA project with create permissions:
+
+> "Please add `pruner-bot@yourdomain.com` to project `[PROJECT KEY]` with the **Developer** role, or a custom role that includes **Create Issues** permission. Also grant the account the **Browse Users and Groups** global permission so it can look up users for issue assignment."
+
+Minimum permissions required:
+
+| Permission | Scope | Why |
+|------------|-------|-----|
+| Create Issues | Project-level | Raise violation tickets |
+| Browse Users and Groups | Global | Look up namespace owner account ID for assignment |
+
+#### Step 3 — Generate an API token
+
+The bot account owner logs into Atlassian and generates a token:
+
+1. Go to `https://id.atlassian.com/manage-profile/security/api-tokens`
+2. Click **Create API token**
+3. Name it `pruner-bot-token`
+4. Copy the token immediately — it is only shown once
+
+#### Step 4 — Collect the following values
+
+| Value | Where to find it | Example |
+|-------|-----------------|---------|
+| `JIRA_URL` | Your Atlassian org URL | `https://yourorg.atlassian.net` |
+| `JIRA_EMAIL` | Bot account email | `pruner-bot@yourdomain.com` |
+| `JIRA_TOKEN` | API token from Step 3 | `ATATT3xFfGF0...` |
+| `JIRA_PROJECT` | Project key visible in JIRA URL | `PLAT` |
+
+---
+
+### ServiceNow CMDB Setup
+
+**Who to contact:** ServiceNow Administrator
+
+Pruner queries ServiceNow to get the list of AG-owned namespaces per cluster.
+
+#### Step 1 — Identify the CMDB table
+
+Ask your ServiceNow admin:
+
+> "What is the table name in CMDB that stores Kubernetes namespace records? We need to query it for namespace name, cluster URL, and owner email."
+
+The table is typically named something like:
+- `cmdb_ci_kubernetes_namespace`
+- `cmdb_ci_k8s_namespace`
+
+#### Step 2 — Confirm required fields exist
+
+The pruner expects these fields on each CMDB record:
+
+| Field | Description |
+|-------|-------------|
+| `name` | Namespace name (e.g. `vendor-ns-42`) |
+| `cluster_url` | OpenShift API URL (e.g. `https://api.cluster-a.example.com:6443`) |
+| `owner_email` | Namespace owner's email address |
+| `environment` | Environment tag (e.g. `prod`, `dev`) |
+
+If any fields are named differently in your instance, update [internal/cmdb/servicenow.go](internal/cmdb/servicenow.go) to match.
+
+#### Step 3 — Create a read-only service account
+
+Ask your ServiceNow admin:
+
+> "Please create a service account for an automation called `pruner-svc` with **read-only** access to the `[table name]` table via the REST API."
+
+#### Step 4 — Collect the following values
+
+| Value | Description |
+|-------|-------------|
+| `SERVICENOW_URL` | ServiceNow instance URL e.g. `https://yourorg.service-now.com` |
+| `SERVICENOW_USER` | Service account username |
+| `SERVICENOW_PASS` | Service account password |
+| `SERVICENOW_TABLE` | CMDB table name |
+| `CLUSTER_URL` | This cluster's API URL — used to filter namespaces |
+
+---
+
+### CHES Setup
+
+**Who to contact:** CHES Onboarding Team (`bcgov/common-hosted-email-service`)
+
+CHES (Common Hosted Email Service) is the BC Government email delivery platform.
+
+#### Step 1 — Request onboarding
+
+Submit an onboarding request to the CHES team to get a client registered:
+
+> "We need a CHES client for an automated service called Pruner that sends image hygiene compliance reports to namespace owners. Expected volume: ~[N] emails per day."
+
+#### Step 2 — Collect the following values
+
+After onboarding, CHES will provide:
+
+| Value | Description |
+|-------|-------------|
+| `CHES_CLIENT_ID` | Your CHES client ID |
+| `CHES_CLIENT_SECRET` | Your CHES client secret |
+| `CHES_FROM` | Authorised sender address (provided by CHES team) |
 
 ---
 

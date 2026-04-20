@@ -12,27 +12,41 @@ import (
 )
 
 const (
-	chesBaseURL  = "https://ches.api.gov.bc.ca/api/v1"
-	chesTokenURL = "https://loginproxy.gov.bc.ca/auth/realms/comsvcauth/protocol/openid-connect/token"
+	defaultChesBaseURL  = "https://ches.api.gov.bc.ca/api/v1"
+	defaultChesTokenURL = "https://loginproxy.gov.bc.ca/auth/realms/comsvcauth/protocol/openid-connect/token"
 )
 
-// Client sends emails  CHES (Common Hosted Email Service).
+// Client sends emails via CHES (Common Hosted Email Service).
 // Requires env vars:
 //
 //	CHES_CLIENT_ID     - CHES service client ID
 //	CHES_CLIENT_SECRET - CHES service client secret
 //	CHES_FROM          - sender address (must be authorised in CHES)
+//	CHES_BASE_URL      - override base URL (optional, for testing)
+//	CHES_TOKEN_URL     - override token URL (optional, for testing)
 type Client struct {
 	clientID     string
 	clientSecret string
 	from         string
+	baseURL      string
+	tokenURL     string
 }
 
 func NewClient() *Client {
+	baseURL := os.Getenv("CHES_BASE_URL")
+	if baseURL == "" {
+		baseURL = defaultChesBaseURL
+	}
+	tokenURL := os.Getenv("CHES_TOKEN_URL")
+	if tokenURL == "" {
+		tokenURL = defaultChesTokenURL
+	}
 	return &Client{
 		clientID:     os.Getenv("CHES_CLIENT_ID"),
 		clientSecret: os.Getenv("CHES_CLIENT_SECRET"),
 		from:         os.Getenv("CHES_FROM"),
+		baseURL:      baseURL,
+		tokenURL:     tokenURL,
 	}
 }
 
@@ -73,7 +87,7 @@ func (c *Client) Send(to, subject, htmlBody string) error {
 		return err
 	}
 
-	req, err := http.NewRequest("POST", chesBaseURL+"/email", bytes.NewReader(body))
+	req, err := http.NewRequest("POST", c.baseURL+"/email", bytes.NewReader(body))
 	if err != nil {
 		return err
 	}
@@ -105,7 +119,7 @@ func (c *Client) fetchToken() (string, error) {
 		"client_secret": {c.clientSecret},
 	}
 
-	resp, err := http.Post(chesTokenURL, "application/x-www-form-urlencoded",
+	resp, err := http.Post(c.tokenURL, "application/x-www-form-urlencoded",
 		strings.NewReader(form.Encode()))
 	if err != nil {
 		return "", err

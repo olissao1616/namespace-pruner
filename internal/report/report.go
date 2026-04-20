@@ -61,9 +61,9 @@ var htmlTemplate = template.Must(template.New("report").Parse(`
 <div class="summary-box">
   <strong>Total Images:</strong> {{.TotalImages}} &nbsp;|&nbsp;
   <strong>Violations:</strong> {{len .Violations}} &nbsp;|&nbsp;
-  <span class="pill pill-red">HIGH {{call .CountBySeverity "HIGH"}}</span> &nbsp;
-  <span class="pill pill-orange">MEDIUM {{call .CountBySeverity "MEDIUM"}}</span> &nbsp;
-  <span class="pill pill-grey">LOW {{call .CountBySeverity "LOW"}}</span>
+  <span class="pill pill-red">HIGH {{.CountBySeverity "HIGH"}}</span> &nbsp;
+  <span class="pill pill-orange">MEDIUM {{.CountBySeverity "MEDIUM"}}</span> &nbsp;
+  <span class="pill pill-grey">LOW {{.CountBySeverity "LOW"}}</span>
 </div>
 
 {{if .Violations}}
